@@ -19,18 +19,50 @@ import shlex
 import argparse
 import logging
 
+from typing import Dict, Optional, List, Set
+
+SwitchMacToPort = Dict[str, int]
+
+class Host:
+    # Can be 0:WORK or 1:GAMING
+    tipo: int
+
+    def __init__(self, t: int):
+        self.tipo = t
+
+class Switch:
+    my_id: int
+
+    slow_ports: Set[int]
+    fast_ports: Set[int]
+
+    state_mac_to_port: Dict[ int, SwitchMacToPort ]
+
+    def __init__(self, t: int):
+        self.tipo = t
+
+class State:
+    # mac_to_port: Dict[int, SwitchMacToPort]
+
+    hosts: List[Host]
+
+    switch: Dict[int, Switch]
+
+    
+
 class Slicing(app_manager.RyuApp):
     # Tested OFP version
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
+
+    state: State
 
     def __init__(self, *args, **kwargs):
         super(Slicing, self).__init__(*args, **kwargs)
         setLogLevel("info")
 
-        info("DIOCANE")
-
         #Bind host MAC adresses to interface
-        self.mac_to_port = {
+        self.state = State();
+        self.state.mac_to_port = {
             1: { "00:00:00:00:00:01": 3, "00:00:00:00:00:02": 4, "00:00:00:00:00:06": 5},
             2: { "00:00:00:00:00:05": 4 },
             3: { "00:00:00:00:00:03": 3, "00:00:00:00:00:04": 4, "00:00:00:00:00:07": 5},
@@ -38,21 +70,6 @@ class Slicing(app_manager.RyuApp):
             5: { "00:00:00:00:01:02": 3 },
         }
 
-        # 9998 used for iperf testing, 9999 used for service packets
-        self.slice_TCport = [9998, 9999]
-
-        #Associate interface to slice
-        self.slice_ports = {
-            1: {1: 1, 2: 2}, 
-            4: {1: 1, 2: 2},
-            2: {1: 2, 2: 2}
-        }
-        self.end_swtiches = [1, 4]
-
-        #Server starts on h3
-        self.current_sever_ip = "172.17.0.4"
-        #The optimal slice at the beginning is 1
-        self.current_slice = 1
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -93,15 +110,17 @@ class Slicing(app_manager.RyuApp):
         )
         datapath.send_msg(out)
 
+    def _work_cofiguration(self):
+        raise NotImplementedError();
+
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
-        info(f"Ricevuto PACCHETTO")
+
         #Get packet info
         msg = ev.msg
 
         datapath = msg.datapath
         dpid = datapath.id
-        info(f"Ricevuto da {dpid}")
 
         ofproto = datapath.ofproto
         in_port = msg.match["in_port"]
@@ -117,14 +136,25 @@ class Slicing(app_manager.RyuApp):
         src_mac = eth.src
 
 
-        if dpid in self.mac_to_port:
-            if dst_mac in self.mac_to_port[dpid]:
-                # Found a predefined host in a predefined switch
+        if dpid in self.state.mac_to_port:
+
+            # Auto-learning source ports for inter-network ( inter-switch really )
+            # communication
+            if src_mac not in self.state.mac_to_port[dpid]:
+                info(f"Saved {src_mac} from port {in_port} of switch {dpid}")
+                # I save the port the packed was coming from
+                self.state.mac_to_port[dpid][ src_mac ] = in_port
+
+            # TODO: Check if a mac is reachable from the requesting host
+
+            if dst_mac in self.state.mac_to_port[dpid]:
+
+                info(f"Found a packet from {src_mac} to {dst_mac} in s{dpid}\n");
 
                 # TODO: bloccare le comunicazioni tra pc di lavoro e di
                 # gioco se sulla stessa rete
 
-                out_port = self.mac_to_port[dpid][dst_mac]
+                out_port = self.state.mac_to_port[dpid][dst_mac]
                 actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
                 match = datapath.ofproto_parser.OFPMatch(eth_dst=dst_mac)
                 self.add_flow(datapath, 1, match, actions)
