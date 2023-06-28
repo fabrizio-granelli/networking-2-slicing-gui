@@ -25,7 +25,7 @@ class NetworkSlicingTopo(Topo):
         h1 = self.addHost(
             "h1",
             cls=DockerHost,
-            dimage="dev_test",
+            dimage="ubuntu:trusty",
             ip="10.0.0.1/24",
             mac="00:00:00:00:00:01",
             docker_args={"hostname": "h1"}
@@ -33,7 +33,7 @@ class NetworkSlicingTopo(Topo):
         h2 = self.addHost(
             "h2",
             cls=DockerHost,
-            dimage="dev_test",
+            dimage="ubuntu:trusty",
             ip="10.0.0.2/24",
             mac="00:00:00:00:00:02",
             docker_args={"hostname": "h2"}
@@ -41,87 +41,85 @@ class NetworkSlicingTopo(Topo):
         h3 = self.addHost(
             "h3",
             cls=DockerHost,
-            dimage="dev_test",
-            ip="10.0.0.1/24",
-            mac="00:00:00:00:00:01",
+            dimage="ubuntu:trusty",
+            ip="10.0.0.3/24",
+            mac="00:00:00:00:00:03",
             docker_args={"hostname": "h3"}
         )
         h4 = self.addHost(
             "h4",
             cls=DockerHost,
-            dimage="dev_test",
-            ip="10.0.0.2/24",
-            mac="00:00:00:00:00:02",
+            dimage="ubuntu:trusty",
+            ip="10.0.0.4/24",
+            mac="00:00:00:00:00:04",
             docker_args={"hostname": "h4"}
         )
         h5 = self.addHost(
             "h5",
             cls=DockerHost,
-            dimage="dev_test",
-            ip="10.0.0.1/24",
-            mac="00:00:00:00:00:01",
+            dimage="ubuntu:trusty",
+            ip="10.0.0.5/24",
+            mac="00:00:00:00:00:05",
             docker_args={"hostname": "h5"}
         )
         g1 = self.addHost(
             "g1",
             cls=DockerHost,
-            dimage="dev_test",
-            ip="10.0.0.3/24",
-            mac="00:00:00:00:00:03",
+            dimage="ubuntu:trusty",
+            ip="10.0.0.6/24",
+            mac="00:00:00:00:00:06",
             docker_args={"hostname": "g2"}
         )
 
         g2 = self.addHost(
             "g2",
             cls=DockerHost,
-            dimage="dev_test",
-            ip="10.0.0.3/24",
-            mac="00:00:00:00:00:03",
+            dimage="ubuntu:trusty",
+            ip="10.0.0.7/24",
+            mac="00:00:00:00:00:07",
             docker_args={"hostname": "g2"}
         )
-        ser1 = self.addHost(
-            "ser1",
+        g_serv = self.addHost(
+            "g_serv",
             cls=DockerHost,
-            dimage="dev_test",
-            ip="10.0.0.1/24",
-            mac="00:00:00:00:00:01",
-            docker_args={"hostname": "ser1"}
+            dimage="ubuntu:trusty",
+            ip="10.0.1.1/24",
+            mac="00:00:00:00:01:01",
+            docker_args={"hostname": "g_serv"}
         )
-        ser2 = self.addHost(
-            "ser2",
+        p_serv = self.addHost(
+            "p_serv",
             cls=DockerHost,
-            dimage="dev_test",
-            ip="10.0.0.1/24",
-            mac="00:00:00:00:00:01",
-            docker_args={"hostname": "ser2"}
+            dimage="ubuntu:trusty",
+            ip="10.0.1.2/24",
+            mac="00:00:00:00:01:02",
+            docker_args={"hostname": "p_serv"}
         )
-
         
-        switches = {}
         for i in range(5):
             sconfig = {"dpid": "%016x" % (i + 1)}
-            switches["s" + str(i+1)] = self.addSwitch("s%d" % (i + 1), **sconfig)
+            self.addSwitch("s%d" % (i + 1), **sconfig)
 
-        self.addLink(switches["s1"], switches["s2"], **gig_net)
-        self.addLink(switches["s1"], switches["s4"], **megabit_net)
-        self.addLink(switches["s2"], switches["s5"], **gig_net)
-        self.addLink(switches["s2"], switches["s3"], **gig_net)
-        self.addLink(switches["s3"], switches["s4"], **megabit_net)
-        self.addLink(switches["s5"], switches["s4"], **gig_net)
+        self.addLink("s1", "s2", 1, 1, **gig_net)
+        self.addLink("s1", "s4", 2, 1, **megabit_net)
+        self.addLink("s2", "s5", 2, 1, **gig_net)
+        self.addLink("s2", "s3", 3, 1, **gig_net)
+        self.addLink("s3", "s4", 2, 3, **megabit_net)
+        self.addLink("s5", "s4", 2, 2, **gig_net)
        
-        self.addLink(h1, switches["s1"], **host_link_config)
-        self.addLink(h2, switches["s1"], **host_link_config)
-        self.addLink(g1, switches["s1"], **host_link_config)
+        self.addLink("h1", "s1", 1, 3, **host_link_config)
+        self.addLink("h2", "s1", 1, 4, **host_link_config)
+        self.addLink("g1", "s1", 1, 5, **host_link_config)
 
-        self.addLink(h5, switches["s2"], **host_link_config)
+        self.addLink("h5", "s2", 1, 4, **host_link_config)
 
-        self.addLink(h3, switches["s3"], **host_link_config)
-        self.addLink(h4, switches["s3"], **host_link_config)
-        self.addLink(g2, switches["s3"], **host_link_config)
+        self.addLink("h3", "s3", 1, 3, **host_link_config)
+        self.addLink("h4", "s3", 1, 4, **host_link_config)
+        self.addLink("g2", "s3", 1, 5, **host_link_config)
 
-        self.addLink(ser1, switches["s4"], **host_link_config)
+        self.addLink("g_serv", "s4", 1, 4, **host_link_config)
 
-        self.addLink(ser2, switches["s5"], **host_link_config)
+        self.addLink("p_serv", "s5", 1, 3, **host_link_config)
 
 
 
@@ -151,9 +149,8 @@ try:
 
         info("\n*** Starting network\n")
         net.build()
-        net.start()
-
-
+        CLI(net)
+        net.stop()
 except Exception as e: 
     print(e)
-    net.stop()
+    # net.stop()
