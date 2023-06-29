@@ -1,3 +1,4 @@
+from os import walk
 from ryu.base import app_manager
 from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
@@ -19,6 +20,15 @@ import shlex
 import argparse
 import logging
 
+from typing import List, Optional, Dict, Set
+from slicing.work_emergency import get_work_emergency_forbidden, get_work_emergency_mac_mapping
+
+from slicing.gaming_slice import get_gaming_forbidden, get_gaming_mac_mapping
+
+from slicing.net_structure import Mode, all_macs
+from slicing.work_slice import get_work_mac_mapping, get_work_forbidden
+
+
 class Slicing(app_manager.RyuApp):
     # Tested OFP version
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
@@ -27,32 +37,25 @@ class Slicing(app_manager.RyuApp):
         super(Slicing, self).__init__(*args, **kwargs)
         setLogLevel("info")
 
-        info("DIOCANE")
 
         #Bind host MAC adresses to interface
-        self.mac_to_port = {
-            1: { "00:00:00:00:00:01": 3, "00:00:00:00:00:02": 4, "00:00:00:00:00:06": 5},
-            2: { "00:00:00:00:00:05": 4 },
-            3: { "00:00:00:00:00:03": 3, "00:00:00:00:00:04": 4, "00:00:00:00:00:07": 5},
-            4: { "00:00:00:00:01:01": 4 },
-            5: { "00:00:00:00:01:02": 3 },
-        }
+        self.mac_to_port: List[Optional[Dict[int, Dict[str, int]]]] = [ None, None, None ] 
+        self.forbidden: List[Optional[Dict[str, Set[str]]]] = [ None, None, None ] 
 
-        # 9998 used for iperf testing, 9999 used for service packets
-        self.slice_TCport = [9998, 9999]
+        self.mac_to_port[Mode.WORK_MODE] = get_work_mac_mapping()
+        self.forbidden[Mode.WORK_MODE] = get_work_forbidden()
 
-        #Associate interface to slice
-        self.slice_ports = {
-            1: {1: 1, 2: 2}, 
-            4: {1: 1, 2: 2},
-            2: {1: 2, 2: 2}
-        }
-        self.end_swtiches = [1, 4]
+        self.mac_to_port[Mode.GAMING_MODE] = get_gaming_mac_mapping()
+        self.forbidden[Mode.GAMING_MODE] = get_gaming_forbidden()
 
-        #Server starts on h3
-        self.current_sever_ip = "172.17.0.4"
-        #The optimal slice at the beginning is 1
-        self.current_slice = 1
+        self.mac_to_port[Mode.WORK_EMERGENCY_MODE] = get_work_emergency_mac_mapping()
+        self.forbidden[Mode.WORK_EMERGENCY_MODE] = get_work_emergency_forbidden()
+        
+        # The datapaths (of the switches) to send the delete command to 
+        self.switch_datapaths = []
+
+        # To set the initial mode
+        self.current_mode = Mode.WORK_EMERGENCY_MODE
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -60,12 +63,15 @@ class Slicing(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-        #Install the table-miss flow entry.
+        # Install the table-miss flow entry.
         match = parser.OFPMatch()
         actions = [
             parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)
         ]
         self.add_flow(datapath, 0, match, actions)
+
+        # Save the datapath of the current switch
+        self.switch_datapaths.append( datapath )
 
     def add_flow(self, datapath, priority, match, actions):
         ofproto = datapath.ofproto
@@ -93,40 +99,69 @@ class Slicing(app_manager.RyuApp):
         )
         datapath.send_msg(out)
 
+    def clear_flows( self ):
+
+        for switch_dp in self.switch_datapaths:
+            ofp_parser = switch_dp.ofproto_parser
+            ofp = switch_dp.ofproto
+
+            ofp_parser.OFPFlowMod(
+                datapath=switch_dp,
+                table_id=ofp.OFPTT_ALL,
+                command=ofp.OFPFC_DELETE,
+                out_port=ofp.OFPP_ANY,
+                out_group=ofp.OFPG_ANY
+            )
+
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
-        info(f"Ricevuto PACCHETTO")
+        # info(f"Ricevuto PACCHETTO")
         #Get packet info
         msg = ev.msg
 
         datapath = msg.datapath
         dpid = datapath.id
-        info(f"Ricevuto da {dpid}")
+        # info(f"Ricevuto da {dpid}")
 
         ofproto = datapath.ofproto
         in_port = msg.match["in_port"]
 
         pkt = packet.Packet(msg.data)
-        eth = pkt.get_protocol(ethernet.ethernet)
+        eth: Optional[ethernet.ethernet] = pkt.get_protocol(ethernet.ethernet) # type: ignore -> il metodo letteralmente filtra per tipo
 
-        if eth.ethertype == ether_types.ETH_TYPE_LLDP:
+        if (
+            eth is None or
+            eth.ethertype == ether_types.ETH_TYPE_LLDP
+        ):
             # ignore lldp packet
             return
 
         dst_mac = eth.dst
         src_mac = eth.src
 
+        if self.mac_to_port[self.current_mode] is None or self.forbidden[self.current_mode] is None:
+            info("Network not already configured, packet dropped\n")
+            return
 
-        if dpid in self.mac_to_port:
-            if dst_mac in self.mac_to_port[dpid]:
-                # Found a predefined host in a predefined switch
+        port_mapping: Dict[int, Dict[str, int]] = self.mac_to_port[self.current_mode] #type: ignore
+        forbidden: Dict[str, Set[str]] = self.forbidden[self.current_mode] #type: ignore
 
-                # TODO: bloccare le comunicazioni tra pc di lavoro e di
-                # gioco se sulla stessa rete
+        if src_mac in forbidden and dst_mac in forbidden[src_mac]:
+            info("Forbidden ")
+            info(f"[s] {src_mac} [d] {dst_mac} [SW] {dpid}\n")
+            return 
 
-                out_port = self.mac_to_port[dpid][dst_mac]
+        if dpid in port_mapping:
+            if src_mac in all_macs() and dst_mac in all_macs():
+                info(f"[s] {src_mac} [d] {dst_mac} [SW] {dpid}\n")
+
+            if dst_mac in port_mapping[dpid]:
+                # Found a predefined host in a predefined switch 
+
+
+                out_port = port_mapping[dpid][dst_mac]
                 actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
-                match = datapath.ofproto_parser.OFPMatch(eth_dst=dst_mac)
+                match = datapath.ofproto_parser.OFPMatch(eth_src=src_mac, eth_dst=dst_mac)
                 self.add_flow(datapath, 1, match, actions)
                 self._send_package(msg, datapath, in_port, actions)
 
