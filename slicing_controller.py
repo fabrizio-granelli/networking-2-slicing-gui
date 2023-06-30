@@ -1,3 +1,4 @@
+from collections import deque
 from os import walk
 from ryu.base import app_manager
 from ryu.controller import ofp_event
@@ -20,6 +21,8 @@ import shlex
 import argparse
 import logging
 
+from textwrap import wrap
+
 from typing import List, Optional, Dict, Set
 from slicing.work_emergency import get_work_emergency_forbidden, get_work_emergency_mac_mapping
 
@@ -36,6 +39,10 @@ class Slicing(app_manager.RyuApp):
     def __init__(self, *args, **kwargs):
         super(Slicing, self).__init__(*args, **kwargs)
         setLogLevel("debug")
+
+        # To print logs even on the connected monitor
+        # It is thread safe (by default)
+        self.log_to_socket = deque()
 
         self.BIND_ADDRESS = "172.17.0.1"
         self.BIND_PORT = 9933
@@ -61,6 +68,11 @@ class Slicing(app_manager.RyuApp):
 
         # To monitor incoming request to change the slicing
         self.thread = hub.spawn(self._monitor)
+
+    def info(self, msg: str):
+
+        self.log_to_socket.appendleft(msg + "\n")
+        info(msg)
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -123,7 +135,7 @@ class Slicing(app_manager.RyuApp):
 
         self.current_mode = slice
 
-        info("Slicing policy / mode changed")
+        self.info("Slicing policy / mode changed")
 
         for dp_i in self.switch_datapaths_cache:
 
@@ -142,35 +154,69 @@ class Slicing(app_manager.RyuApp):
 
             switch_dp.send_msg(mod)
             
-        info("Flows cleared")
+        self.info("Flows cleared")
 
         for dp_i in self.switch_datapaths_cache:
             switch_dp = self.switch_datapaths_cache[dp_i]
 
             self._flow_entry_empty(switch_dp)
 
-        info("Initialized switches")
+        self.info("Initialized switches")
 
     def _monitor(self):
 
-        info("Thread started")
+        debug("Thread started")
 
-        # Inside the thread, start listening for commands
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind((self.BIND_ADDRESS, self.BIND_PORT))
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind((self.BIND_ADDRESS, self.BIND_PORT))
+            sock.listen()
+            while True:
+                # Infinite loop on a blocking accept call, in case the
+                # socket get disconnected
+                conn, addr = sock.accept()
+                with conn:
+                    print(f"Connected by {addr}")
+                    while True:
+                        data = conn.recv(1024)
+                        if not data:
+                            break
 
-        while True:
-            data, _ = sock.recvfrom(self.BIND_PORT)
+                        msg_recv = data.decode("utf-8").split("_")
+                        debug("\nRECV: ", msg_recv)
 
-            msg_recv = data.decode("utf-8").split("_")
-            info("\nRECV: ", msg_recv)
+                        if msg_recv[0] == "SLICE":
+                            self.init_flows_slice(int(msg_recv[1]))
+                            conn.sendall("DONE".encode("UTF-8"))
 
-            if msg_recv[0] == "SLICE":
-                self.init_flows_slice(int(msg_recv[1]))
-            else:
-                info("COMANDO SCONOSCIUTO")
+                        elif msg_recv[0] == "PING":
 
-        # self.init_flows_slice()
+                            sel = True
+
+                            while sel is not None:
+                                # Taking all the log lines in log_to_socket and sending them
+                                # to the client to print them out
+                                try:
+                                    sel = self.log_to_socket.pop()
+                                except IndexError:
+                                    sel = None
+
+                                if sel:
+                                    # Splitting the text in finite-size chunks when sending
+                                    # them to the client
+                                    # TODO: padding?
+
+                                    # Fine with ascii text
+                                    chunks = [sel[i:i+1024] for i in range(0, len(sel), 1024)]
+
+                                    print(chunks)
+
+                                    for chunk in chunks:
+                                        conn.sendall(chunk.encode("UTF-8"))
+
+                            conn.sendall("~~".encode("UTF-8"))
+
+                        else:
+                            debug("COMANDO SCONOSCIUTO")
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
@@ -199,20 +245,20 @@ class Slicing(app_manager.RyuApp):
         src_mac = eth.src
 
         if self.mac_to_port[self.current_mode] is None or self.forbidden[self.current_mode] is None:
-            info("Network not already configured, packet dropped\n")
+            self.info("Network not already configured, packet dropped\n")
             return
 
         port_mapping: Dict[int, Dict[str, int]] = self.mac_to_port[self.current_mode] #type: ignore
         forbidden: Dict[str, Set[str]] = self.forbidden[self.current_mode] #type: ignore
 
         if src_mac in forbidden and dst_mac in forbidden[src_mac]:
-            info("Forbidden ")
-            info(f"[s] {src_mac} [d] {dst_mac} [SW] {dpid}\n")
+            self.info("Forbidden ")
+            self.info(f"[s] {src_mac} [d] {dst_mac} [SW] {dpid}\n")
             return 
 
         if dpid in port_mapping:
             if src_mac in all_macs() and dst_mac in all_macs():
-                info(f"[s] {src_mac} [d] {dst_mac} [SW] {dpid}\n")
+                self.info(f"[s] {src_mac} [d] {dst_mac} [SW] {dpid}\n")
 
             if dst_mac in port_mapping[dpid]:
                 # Found a predefined host in a predefined switch 
