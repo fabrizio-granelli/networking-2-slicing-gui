@@ -1,7 +1,7 @@
 from os import walk
 from ryu.base import app_manager
 from ryu.controller import ofp_event
-from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
+from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER, DEAD_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
@@ -11,7 +11,7 @@ from ryu.lib.packet import udp
 from ryu.lib.packet import tcp
 from ryu.lib.packet import icmp
 from ryu.lib import hub
-from mininet.log import info, setLogLevel
+from mininet.log import info,debug, setLogLevel
 import socket
 import time
 import subprocess
@@ -35,8 +35,10 @@ class Slicing(app_manager.RyuApp):
 
     def __init__(self, *args, **kwargs):
         super(Slicing, self).__init__(*args, **kwargs)
-        setLogLevel("info")
+        setLogLevel("debug")
 
+        self.BIND_ADDRESS = "172.17.0.1"
+        self.BIND_PORT = 9933
 
         #Bind host MAC adresses to interface
         self.mac_to_port: List[Optional[Dict[int, Dict[str, int]]]] = [ None, None, None ] 
@@ -52,14 +54,21 @@ class Slicing(app_manager.RyuApp):
         self.forbidden[Mode.WORK_EMERGENCY_MODE] = get_work_emergency_forbidden()
         
         # The datapaths (of the switches) to send the delete command to 
-        self.switch_datapaths = []
+        self.switch_datapaths_cache = {}
 
         # To set the initial mode
         self.current_mode = Mode.WORK_EMERGENCY_MODE
 
+        # To monitor incoming request to change the slicing
+        self.thread = hub.spawn(self._monitor)
+
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
         datapath = ev.msg.datapath
+
+        self._flow_entry_empty(datapath)
+
+    def _flow_entry_empty(self, datapath):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
@@ -70,8 +79,17 @@ class Slicing(app_manager.RyuApp):
         ]
         self.add_flow(datapath, 0, match, actions)
 
-        # Save the datapath of the current switch
-        self.switch_datapaths.append( datapath )
+    @set_ev_cls(ofp_event.EventOFPStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
+    def _state_change_handler(self, ev):
+        datapath = ev.datapath
+        if ev.state == MAIN_DISPATCHER:
+            if datapath.id not in self.switch_datapaths_cache:
+                debug('register datapath: %016x', datapath.id)
+                self.switch_datapaths_cache[datapath.id] = datapath
+        elif ev.state == DEAD_DISPATCHER:
+            if datapath.id in self.switch_datapaths_cache:
+                debug('unregister datapath: %016x', datapath.id)
+                del self.switch_datapaths_cache[datapath.id]
 
     def add_flow(self, datapath, priority, match, actions):
         ofproto = datapath.ofproto
@@ -99,19 +117,60 @@ class Slicing(app_manager.RyuApp):
         )
         datapath.send_msg(out)
 
-    def clear_flows( self ):
+    def init_flows_slice( self, slice ):
 
-        for switch_dp in self.switch_datapaths:
+        assert slice == Mode.WORK_MODE or slice == Mode.GAMING_MODE or slice == Mode.WORK_EMERGENCY_MODE 
+
+        self.current_mode = slice
+
+        info("Slicing policy / mode changed")
+
+        for dp_i in self.switch_datapaths_cache:
+
+            switch_dp = self.switch_datapaths_cache[dp_i]
+
             ofp_parser = switch_dp.ofproto_parser
             ofp = switch_dp.ofproto
 
-            ofp_parser.OFPFlowMod(
+            mod = ofp_parser.OFPFlowMod(
                 datapath=switch_dp,
                 table_id=ofp.OFPTT_ALL,
                 command=ofp.OFPFC_DELETE,
                 out_port=ofp.OFPP_ANY,
                 out_group=ofp.OFPG_ANY
             )
+
+            switch_dp.send_msg(mod)
+            
+        info("Flows cleared")
+
+        for dp_i in self.switch_datapaths_cache:
+            switch_dp = self.switch_datapaths_cache[dp_i]
+
+            self._flow_entry_empty(switch_dp)
+
+        info("Initialized switches")
+
+    def _monitor(self):
+
+        info("Thread started")
+
+        # Inside the thread, start listening for commands
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind((self.BIND_ADDRESS, self.BIND_PORT))
+
+        while True:
+            data, _ = sock.recvfrom(self.BIND_PORT)
+
+            msg_recv = data.decode("utf-8").split("_")
+            info("\nRECV: ", msg_recv)
+
+            if msg_recv[0] == "SLICE":
+                self.init_flows_slice(int(msg_recv[1]))
+            else:
+                info("COMANDO SCONOSCIUTO")
+
+        # self.init_flows_slice()
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
