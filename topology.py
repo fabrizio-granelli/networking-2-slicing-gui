@@ -14,60 +14,8 @@ from mininet.topo import Topo
 from mininet.node import OVSKernelSwitch, RemoteController
     
 class NetworkTopology(Topo):
-    def __init__(self):
-
-        Topo.__init__(self)
-
-        band = {"bw":100}
-
-        h1 = self.addHost(
-            "h1",
-            cls=DockerHost,
-            dimage="dev_test",
-            ip="10.0.0.1/24",
-            mac="00:00:00:00:00:01",
-            docker_args={"hostname": "h1"}
-        )
-        
-
-        h2 = self.addHost(
-            "h2",
-            cls=DockerHost,
-            dimage="dev_test",
-            ip="10.0.0.2/24",
-            mac="00:00:00:00:00:02",
-            docker_args={"hostname": "h2"}
-        )
-
-        #for i in range(2):
-        #    sconfig = {"dpid": "%016x" % (i + 1)}
-        #    switch=self.addSwitch("s%d" % (i + 1))
-        s1 = self.addSwitch("s1")
-        s2 = self.addSwitch("s2")
-
-        
-
-        self.addLink(h1,"s1",0,1,**band)
-
-        self.addLink(h2,"s2",0,1,**band)
-
-        self.addLink("s1","s2",2,2,**band)
 
     
-
-        
-
-        
-
-
-
-
-
-
-        
-
-
-    """
     def __init__(self):
 
         Topo.__init__(self)
@@ -80,7 +28,7 @@ class NetworkTopology(Topo):
         h1 = self.addHost(
             "h1",
             cls=DockerHost,
-            dimage="ubuntu:trusty",
+            dimage="dev_test",
             ip="10.0.0.1/24",
             mac="00:00:00:00:00:01",
             docker_args={"hostname": "h1"}
@@ -88,7 +36,7 @@ class NetworkTopology(Topo):
         h2 = self.addHost(
             "h2",
             cls=DockerHost,
-            dimage="ubuntu:trusty",
+            dimage="dev_test",
             ip="10.0.0.2/24",
             mac="00:00:00:00:00:02",
             docker_args={"hostname": "h2"}
@@ -96,7 +44,7 @@ class NetworkTopology(Topo):
         h3 = self.addHost(
             "h3",
             cls=DockerHost,
-            dimage="ubuntu:trusty",
+            dimage="dev_test",
             ip="10.0.0.3/24",
             mac="00:00:00:00:00:03",
             docker_args={"hostname": "h3"}
@@ -104,7 +52,7 @@ class NetworkTopology(Topo):
         h4 = self.addHost(
             "h4",
             cls=DockerHost,
-            dimage="ubuntu:trusty",
+            dimage="dev_test",
             ip="10.0.0.4/24",
             mac="00:00:00:00:00:04",
             docker_args={"hostname": "h4"}
@@ -112,7 +60,7 @@ class NetworkTopology(Topo):
         h5 = self.addHost(
             "h5",
             cls=DockerHost,
-            dimage="ubuntu:trusty",
+            dimage="dev_test",
             ip="10.0.0.5/24",
             mac="00:00:00:00:00:05",
             docker_args={"hostname": "h5"}
@@ -120,7 +68,7 @@ class NetworkTopology(Topo):
         g1 = self.addHost(
             "g1",
             cls=DockerHost,
-            dimage="ubuntu:trusty",
+            dimage="dev_test",
             ip="10.0.0.6/24",
             mac="00:00:00:00:00:06",
             docker_args={"hostname": "g1"}
@@ -129,7 +77,7 @@ class NetworkTopology(Topo):
         g2 = self.addHost(
             "g2",
             cls=DockerHost,
-            dimage="ubuntu:trusty",
+            dimage="dev_test",
             ip="10.0.0.7/24",
             mac="00:00:00:00:00:07",
             docker_args={"hostname": "g2"}
@@ -137,16 +85,16 @@ class NetworkTopology(Topo):
         g_serv = self.addHost(
             "g_serv",
             cls=DockerHost,
-            dimage="ubuntu:trusty",
-            ip="10.0.1.1/24",
+            dimage="dev_test",
+            ip="10.0.0.8/24",
             mac="00:00:00:00:01:01",
             docker_args={"hostname": "g_serv"}
         )
         p_serv = self.addHost(
             "p_serv",
             cls=DockerHost,
-            dimage="ubuntu:trusty",
-            ip="10.0.1.2/24",
+            dimage="dev_test",
+            ip="10.0.0.9/24",
             mac="00:00:00:00:01:02",
             docker_args={"hostname": "p_serv"}
         )
@@ -175,11 +123,6 @@ class NetworkTopology(Topo):
         self.addLink("g_serv", "s4", 1, 4, **host_link_config)
         self.addLink("p_serv", "s5", 1, 3, **host_link_config)
 
-        """
-    
-
-
-        
 
 
 
@@ -204,8 +147,6 @@ try:
 
         mgr = VNFManager(net)
 
-
-        
 
 
         info("*** Connecting to the controller\n")
