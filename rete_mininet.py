@@ -43,7 +43,7 @@ class ComplexNetworkTopo(Topo):
             h_n = i+1
             self.addHost(
                 f"h{h_n}", 
-                # ip=f"10.0.0.{h_n}/24",
+                ip=f"10.0.0.{h_n}/24",
                 # no problem, h_n <= 7
                 mac=f"00:00:00:00:00:0{h_n}",
                 **host_config
@@ -61,7 +61,7 @@ class ComplexNetworkTopo(Topo):
             h_n = work_hosts_num+i+1
             self.addHost(
                 f"g{i+1}", 
-                # ip=f"10.0.0.{h_n}/24",
+                ip=f"10.0.0.{h_n}/24",
                 # no problem, h_n <= 7
                 mac=f"00:00:00:00:00:0{h_n}",
                 **host_config
@@ -71,8 +71,18 @@ class ComplexNetworkTopo(Topo):
         self.addLink("g2", "s3", 1, 5, **host_link_config)
 
         # Servers configuration and links
-        self.addHost("ps", **server_config)
-        self.addHost("gs", **server_config)
+        self.addHost(
+            "gs", 
+            ip=f"10.0.0.{work_hosts_num+gaming_hosts_num+1}/24",
+            mac=f"00:00:00:00:01:01",
+            **server_config
+        )
+        self.addHost(
+            "ps", 
+            ip=f"10.0.0.{work_hosts_num+gaming_hosts_num+2}/24",
+            mac=f"00:00:00:00:01:02",
+            **server_config
+        )
 
         self.addLink("gs", "s4", 1, 4, **host_link_config)
         self.addLink("ps", "s5", 1, 3, **host_link_config)
