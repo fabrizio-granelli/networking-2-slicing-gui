@@ -6,14 +6,68 @@ from subprocess import check_output
 
 from comnetsemu.cli import CLI
 from comnetsemu.net import Containernet, VNFManager
-from comnetsemu.node import DockerHost
+from comnetsemu.node import DockerHost 
 from mininet.link import TCLink
 from mininet.log import info, setLogLevel
 
 from mininet.topo import Topo
 from mininet.node import OVSKernelSwitch, RemoteController
     
-class NetworkSlicingTopo(Topo):
+class NetworkTopology(Topo):
+    def __init__(self):
+
+        Topo.__init__(self)
+
+        band = {"bw":100}
+
+        h1 = self.addHost(
+            "h1",
+            cls=DockerHost,
+            dimage="dev_test",
+            ip="10.0.0.1/24",
+            mac="00:00:00:00:00:01",
+            docker_args={"hostname": "h1"}
+        )
+        
+
+        h2 = self.addHost(
+            "h2",
+            cls=DockerHost,
+            dimage="dev_test",
+            ip="10.0.0.2/24",
+            mac="00:00:00:00:00:02",
+            docker_args={"hostname": "h2"}
+        )
+
+        #for i in range(2):
+        #    sconfig = {"dpid": "%016x" % (i + 1)}
+        #    switch=self.addSwitch("s%d" % (i + 1))
+        s1 = self.addSwitch("s1")
+        s2 = self.addSwitch("s2")
+
+        
+
+        self.addLink(h1,"s1",0,1,**band)
+
+        self.addLink(h2,"s2",0,1,**band)
+
+        self.addLink("s1","s2",2,2,**band)
+
+    
+
+        
+
+        
+
+
+
+
+
+
+        
+
+
+    """
     def __init__(self):
 
         Topo.__init__(self)
@@ -21,6 +75,7 @@ class NetworkSlicingTopo(Topo):
         gig_net = { "bw": 1000 }
         megabit_net = { "bw": 100 }
         host_link_config = dict()
+        
         
         h1 = self.addHost(
             "h1",
@@ -68,7 +123,7 @@ class NetworkSlicingTopo(Topo):
             dimage="ubuntu:trusty",
             ip="10.0.0.6/24",
             mac="00:00:00:00:00:06",
-            docker_args={"hostname": "g2"}
+            docker_args={"hostname": "g1"}
         )
 
         g2 = self.addHost(
@@ -118,12 +173,18 @@ class NetworkSlicingTopo(Topo):
         self.addLink("g2", "s3", 1, 5, **host_link_config)
 
         self.addLink("g_serv", "s4", 1, 4, **host_link_config)
-
         self.addLink("p_serv", "s5", 1, 3, **host_link_config)
 
+        """
+    
 
 
-topos = {"networkslicingtopo": (lambda: NetworkSlicingTopo())}
+        
+
+
+
+#topos = {"networkslicingtopo": (lambda: NetworkTopology())}
+
 
 
 try:
@@ -131,7 +192,7 @@ try:
         
         setLogLevel("info")
 
-        topo = NetworkSlicingTopo()
+        topo = NetworkTopology()
         net = Containernet(
             topo=topo,
             switch=OVSKernelSwitch,
@@ -143,13 +204,23 @@ try:
 
         mgr = VNFManager(net)
 
+
+        
+
+
         info("*** Connecting to the controller\n")
         controller = RemoteController("c1", ip="127.0.0.1", port=6633)
         net.addController(controller)
+        #net.addController("c0")
 
         info("\n*** Starting network\n")
+        print("OK1")
         net.build()
-        CLI(net)
+        net.start()
+        print("OK")
+        
+        k=CLI(net)
+
         net.stop()
 except Exception as e: 
     print(e)
