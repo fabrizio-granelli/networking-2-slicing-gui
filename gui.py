@@ -24,7 +24,7 @@ def get_logs():
             data = sock.recv(1024)
 
             while not data.decode("UTF-8").endswith("~~"):
-                print( data )
+                # print( data )
                 recvd += data.decode("UTF-8")
                 data = sock.recv(1024)
 

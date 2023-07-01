@@ -69,7 +69,7 @@ class Slicing(app_manager.RyuApp):
         # To monitor incoming request to change the slicing
         self.thread = hub.spawn(self._monitor)
 
-    def info(self, msg: str):
+    def _info(self, msg: str):
 
         self.log_to_socket.appendleft(msg + "\n")
         info(msg)
@@ -81,10 +81,10 @@ class Slicing(app_manager.RyuApp):
         self._flow_entry_empty(datapath)
 
     def _flow_entry_empty(self, datapath):
+        # Install the table-miss flow entry.
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-        # Install the table-miss flow entry.
         match = parser.OFPMatch()
         actions = [
             parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)
@@ -135,7 +135,7 @@ class Slicing(app_manager.RyuApp):
 
         self.current_mode = slice
 
-        self.info("Slicing policy / mode changed")
+        self._info("Slicing policy / mode changed")
 
         for dp_i in self.switch_datapaths_cache:
 
@@ -154,14 +154,14 @@ class Slicing(app_manager.RyuApp):
 
             switch_dp.send_msg(mod)
             
-        self.info("Flows cleared")
+        self._info("Flows cleared")
 
         for dp_i in self.switch_datapaths_cache:
             switch_dp = self.switch_datapaths_cache[dp_i]
 
             self._flow_entry_empty(switch_dp)
 
-        self.info("Initialized switches")
+        self._info("Initialized switches")
 
     def _monitor(self):
 
@@ -245,20 +245,20 @@ class Slicing(app_manager.RyuApp):
         src_mac = eth.src
 
         if self.mac_to_port[self.current_mode] is None or self.forbidden[self.current_mode] is None:
-            self.info("Network not already configured, packet dropped\n")
+            self._info("Network not already configured, packet dropped\n")
             return
 
         port_mapping: Dict[int, Dict[str, int]] = self.mac_to_port[self.current_mode] #type: ignore
         forbidden: Dict[str, Set[str]] = self.forbidden[self.current_mode] #type: ignore
 
         if src_mac in forbidden and dst_mac in forbidden[src_mac]:
-            self.info("Forbidden ")
-            self.info(f"[s] {src_mac} [d] {dst_mac} [SW] {dpid}\n")
+            self._info("Forbidden ")
+            self._info(f"[s] {src_mac} [d] {dst_mac} [SW] {dpid}\n")
             return 
 
         if dpid in port_mapping:
             if src_mac in all_macs() and dst_mac in all_macs():
-                self.info(f"[s] {src_mac} [d] {dst_mac} [SW] {dpid}\n")
+                self._info(f"[s] {src_mac} [d] {dst_mac} [SW] {dpid}\n")
 
             if dst_mac in port_mapping[dpid]:
                 # Found a predefined host in a predefined switch 
