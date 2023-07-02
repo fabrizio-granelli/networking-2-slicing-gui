@@ -54,10 +54,15 @@ Inserire test in emergency mode (CLI e GUI)
 
 ### Useful command 
 ```mininet> dpctl dump-flows``` -> Show all the switches flows
+
 ```mininet> h1 ping h2``` (It also works with other hosts) 
+
 ```mininet> h1 h2``` -> Verify the bandwidth of the linkage between two hosts (It also works with other hosts) 
+
 ```mininet> net``` -> Shows all the hosts
+
 ```mininet> ports``` -> Shows all switches and their linkage with the hosts
+
 ```mininet> exit``` -> Exit from mininet
 
 ## Presentation
