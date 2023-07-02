@@ -21,10 +21,10 @@ def get_work_mac_mapping():
             # Fast (lateral and server) connection
             mac("h1"): 1, mac("h2"): 1, mac("h3"): 3, mac("h4"): 3,
 
-            mac("ps"): 2,
+            mac("ps"): (2, 34),
 
             # Fast (bottom, slow bottleneck) connection
-            mac("g1"): 2, mac("g2"): 2,
+            mac("g1"): (2, 12), mac("g2"): (2, 12),
 
             # Gaming server missing: no hosts need to contact that host
         },

@@ -23,7 +23,7 @@ import logging
 
 from textwrap import wrap
 
-from typing import List, Optional, Dict, Set
+from typing import List, Optional, Dict, Set, Tuple
 from slicing.work_emergency import get_work_emergency_forbidden, get_work_emergency_mac_mapping
 
 from slicing.gaming_slice import get_gaming_forbidden, get_gaming_mac_mapping
@@ -31,6 +31,23 @@ from slicing.gaming_slice import get_gaming_forbidden, get_gaming_mac_mapping
 from slicing.net_structure import Mode, all_macs
 from slicing.work_slice import get_work_mac_mapping, get_work_forbidden
 
+from ryu.cfg import CONF
+from ryu.lib.ovs.bridge import OVSBridge
+
+OVSDB_ADDR = 'unix:/var/run/openvswitch/db.sock'
+
+queues = {
+    5: {
+        1: [ 900, 100 ],
+        2: [ 900, 100 ],
+    },
+    2: {
+        2: [ 900, 100 ],
+    },
+    4: {
+        2: [ 900, 100 ],
+    },
+}
 
 class Slicing(app_manager.RyuApp):
     # Tested OFP version
@@ -64,7 +81,7 @@ class Slicing(app_manager.RyuApp):
         self.switch_datapaths_cache = {}
 
         # To set the initial mode
-        self.current_mode = Mode.WORK_EMERGENCY_MODE
+        self.current_mode = Mode.WORK_MODE
 
         # To monitor incoming request to change the slicing
         self.thread = hub.spawn(self._monitor)
@@ -224,7 +241,7 @@ class Slicing(app_manager.RyuApp):
         #Get packet info
         msg = ev.msg
 
-        datapath = msg.datapath
+        datapath: app_manager.Datapath = msg.datapath
         dpid = datapath.id
         # info(f"Ricevuto da {dpid}")
 
@@ -236,6 +253,7 @@ class Slicing(app_manager.RyuApp):
 
         if (
             eth is None or
+            dpid is None or
             eth.ethertype == ether_types.ETH_TYPE_LLDP
         ):
             # ignore lldp packet
@@ -263,12 +281,26 @@ class Slicing(app_manager.RyuApp):
             if dst_mac in port_mapping[dpid]:
                 # Found a predefined host in a predefined switch 
 
-
                 out_port = port_mapping[dpid][dst_mac]
-                actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
-                match = datapath.ofproto_parser.OFPMatch(eth_src=src_mac, eth_dst=dst_mac)
-                self.add_flow(datapath, 1, match, actions)
-                self._send_package(msg, datapath, in_port, actions)
+                if  isinstance(out_port, Tuple):
+
+                    out_port, queue_id = out_port
+
+                    print("QUEUEUEUEUEEUEUEUE")
+
+                    actions = [
+                        datapath.ofproto_parser.OFPActionSetQueue(queue_id=34),
+                        datapath.ofproto_parser.OFPActionOutput(out_port)
+                    ]
+                    match = datapath.ofproto_parser.OFPMatch(eth_src=src_mac, eth_dst=dst_mac)
+                    self.add_flow(datapath, 1, match, actions)
+                    self._send_package(msg, datapath, in_port, actions)
+
+                else:
+                    actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
+                    match = datapath.ofproto_parser.OFPMatch(eth_src=src_mac, eth_dst=dst_mac)
+                    self.add_flow(datapath, 1, match, actions)
+                    self._send_package(msg, datapath, in_port, actions)
 
         elif dpid not in self.end_swtiches:
             # Found unknown switch, return
