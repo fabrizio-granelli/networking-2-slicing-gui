@@ -14,7 +14,7 @@ Depending on the mode selected the bandwidth is divided between the slice
 ```IMPORTANT! A blue linkage means that the host is disconnected from the network```
 
 ### Work mode
-While in work mode every connection between Gaming and Work is severed, meaning that 
+While in ```work mode``` every connection between Gaming and Work is severed, meaning that 
 - g1, g2, gs will be connected each other at 100Mbit/sec
 - h1-h5 and ps will be connected each other at 1Gbit/sec 
 
@@ -25,7 +25,7 @@ While in work mode every connection between Gaming and Work is severed, meaning 
 Inserire test in work mode (CLI e GUI)
 
 ### Gaming mode
-While in gaming mode only ps is disconnected from the network, every other hosts is connected with the fast slice
+While in ```gaming mode``` only ps is disconnected from the network, every other hosts is connected with the fast slice
 
 ![image](images/Gaming.png)
 
@@ -34,7 +34,7 @@ While in gaming mode only ps is disconnected from the network, every other hosts
 Inserire test in gaming mode (CLI e GUI)
 
 ### Emergency mode
-While in emergency mode only h1-h5 and ps are connected with each other with the fast slice
+While in ```emergency mode``` only h1-h5 and ps are connected with each other with the fast slice
 
 ![image](images/Emergency.png)
 
