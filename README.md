@@ -1,11 +1,11 @@
 # Networking-2-slicing
 
 ## Introduction
-The goal of the project is to implement a network slicing to enable dynamic activaton and deactivation of network slicing through both a GUI and CLI, considering the needs of the network. Three slices are implemented (Work, Gaming, Emergency).
+The goal of the project is to implement a network slicing to enable dynamic activaton and deactivation of network slicing through both a GUI and CLI, considering the needs of the network. Three slices are implemented (```Work```, ```Gaming```, ```Emergency```).
 
 The topology is composed by
-- 1 SDN controller (c1)
-- 5 OpenFlow switches (s1, s2, s3, s4, s5)
+- 1 SDN controller (```c1```)
+- 5 OpenFlow switches (```s1```, ```s2```, ```s3```, ```s4```, ```s5```)
 - 9 Hosts (h1, h2, h3, h4, h5, ps, g1, g2, gs)
 
 ## Project Description
@@ -44,13 +44,19 @@ Inserire test in emergency mode (CLI e GUI)
 
 ## How to run
 1. Connect with a comnetsemu portale or install all the functionalities in your system
-2. 
-3. Launch the controller 
+2. Launch the controller  
 ```$ ryu-manager controller.py```
-4. To run the program with the GUI launch
+3. To run the program with the GUI launch
 ```$ python3 gui.py```
-5. Emulate the topology with mininet
+4. Emulate the topology with mininet
 ```$ sudo python3 topology.py```
+
+```IMPORTANT! Remember to delete the topology when you exit mininet, through the commands```
+
+```
+mininet> exit
+$ sudo mn -c
+```
 
 ### Useful command 
 ```mininet> dpctl dump-flows``` -> Show all the switches flows
@@ -63,7 +69,6 @@ Inserire test in emergency mode (CLI e GUI)
 
 ```mininet> ports``` -> Shows all switches and their linkage with the hosts
 
-```mininet> exit``` -> Exit from mininet
 
 ## Presentation
 [Project presentations]()
