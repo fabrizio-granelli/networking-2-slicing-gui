@@ -6,7 +6,7 @@ The goal of the project is to implement a network slicing to enable dynamic acti
 The topology is composed by
 - 1 SDN controller (```c1```)
 - 5 OpenFlow switches (```s1```, ```s2```, ```s3```, ```s4```, ```s5```)
-- 9 Hosts (h1, h2, h3, h4, h5, ps, g1, g2, gs)
+- 9 Hosts (```h1```, ```h2```, ```h3```, ```h4```, ```h5```, ```ps```, ```g1```, ```g2```, ```gs```)
 
 ## Project Description
 Depending on the mode selected the bandwidth is divided between the slice
