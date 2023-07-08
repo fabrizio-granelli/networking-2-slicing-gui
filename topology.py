@@ -162,7 +162,8 @@ try:
         net.build()
         net.start()
         print("OK")
-        print(check_output(["./queue_create.sh"]))
+        #print(check_output(["./mapping_test.sh"]))
+        #print(check_output(["./queue_create.sh"]))
         
         k=CLI(net)
 
