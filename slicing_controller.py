@@ -49,6 +49,7 @@ queues = {
     },
 }
 
+
 class Slicing(app_manager.RyuApp):
     # Tested OFP version
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
@@ -86,6 +87,7 @@ class Slicing(app_manager.RyuApp):
         # To monitor incoming request to change the slicing
         self.thread = hub.spawn(self._monitor)
 
+
     def _info(self, msg: str):
 
         self.log_to_socket.appendleft(msg + "\n")
@@ -94,8 +96,15 @@ class Slicing(app_manager.RyuApp):
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
         datapath = ev.msg.datapath
+        dpid = datapath.id
 
         self._flow_entry_empty(datapath)
+
+        # if dpid in queues:
+        #     for port_id in queues[dpid]:
+        #         for speed in queues[dpid][port_id]:
+        #
+        #             self._configure_queue(dpid, port_id, speed)
 
     def _flow_entry_empty(self, datapath):
         # Install the table-miss flow entry.
@@ -107,6 +116,12 @@ class Slicing(app_manager.RyuApp):
             parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)
         ]
         self.add_flow(datapath, 0, match, actions)
+
+    # def _configure_queue(self, dpid:int, portid: int, max_rate: int):
+    #
+    #     info(f"Requested configuration of dpid: {dpid}, portid: {portid}, max_rate: {max_rate}")
+    #     ovs_bridge = OVSBridge(CONF, datapath_id=dpid, ovsdb_addr=OVSDB_ADDR)
+    #     info(ovs_bridge.set_qos(f"s{dpid}-eth{portid}",type='linux-htb',max_rate=str(max_rate)))
 
     @set_ev_cls(ofp_event.EventOFPStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
     def _state_change_handler(self, ev):
@@ -120,14 +135,20 @@ class Slicing(app_manager.RyuApp):
                 debug('unregister datapath: %016x', datapath.id)
                 del self.switch_datapaths_cache[datapath.id]
 
-    def add_flow(self, datapath, priority, match, actions):
+    def add_flow(self, datapath: app_manager.Datapath, priority, match, actions):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
         #Construct flow_mod message and send it.
-        inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
+        inst = [
+            parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)
+        ]
         mod = parser.OFPFlowMod(
-            datapath=datapath, priority=priority, match=match, instructions=inst
+            datapath=datapath,
+            priority=priority,
+            match=match,
+            instructions=inst,
+            idle_timeout=0
         )
         datapath.send_msg(mod)
 
@@ -179,6 +200,9 @@ class Slicing(app_manager.RyuApp):
             self._flow_entry_empty(switch_dp)
 
         self._info("Initialized switches")
+
+
+    
 
     def _monitor(self):
 
@@ -293,13 +317,13 @@ class Slicing(app_manager.RyuApp):
                         datapath.ofproto_parser.OFPActionOutput(out_port)
                     ]
                     match = datapath.ofproto_parser.OFPMatch(eth_src=src_mac, eth_dst=dst_mac)
-                    self.add_flow(datapath, 1, match, actions)
+                    self.add_flow(datapath, 65500, match, actions)
                     self._send_package(msg, datapath, in_port, actions)
 
                 else:
                     actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
                     match = datapath.ofproto_parser.OFPMatch(eth_src=src_mac, eth_dst=dst_mac)
-                    self.add_flow(datapath, 1, match, actions)
+                    self.add_flow(datapath, 65500, match, actions)
                     self._send_package(msg, datapath, in_port, actions)
 
         elif dpid not in self.end_swtiches:
@@ -309,6 +333,7 @@ class Slicing(app_manager.RyuApp):
             match = datapath.ofproto_parser.OFPMatch(in_port=in_port)
             self.add_flow(datapath, 1, match, actions)
             self._send_package(msg, datapath, in_port, actions)
+
 
 
 
