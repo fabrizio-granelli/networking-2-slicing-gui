@@ -18,13 +18,14 @@ def get_work_mac_mapping():
         2: {
             # Direct connections
             mac("h5"): 4,
+
             # Fast (lateral and server) connection
             mac("h1"): 1, mac("h2"): 1, mac("h3"): 3, mac("h4"): 3,
 
-            mac("ps"): (2, 123),
+            mac("ps"): (2, 251),
 
             # Fast (bottom, slow bottleneck) connection
-            mac("g1"): (2, 234), mac("g2"): (2, 234),
+            mac("g1"): (2, 252), mac("g2"): (2, 252),   
 
             # Gaming server missing: no hosts need to contact that host
         },
@@ -52,20 +53,23 @@ def get_work_mac_mapping():
 
             # No other connections in work mode
             # TODO: maybe h5?
+            mac("h5"): (2,45),
         },
 
         5: {
             # Direct connections
             mac("ps"): 3,
 
-            # fast connection
-            mac("h1"): 1, mac("h2"): 1, mac("h3"): 1, mac("h4"): 1, mac("h5"): 1,
+            # fast connection  dst, {src : (output port, output queue)}
+            mac("h1"): {mac("ps") : (1,521)}, mac("h2"): {mac("ps"):(1,521)}, mac("h3"): {mac("ps"):(1,521)}, mac("h4"): {mac("ps"):(1,521)}, mac("h5"): {mac("ps"):(1,521), mac("g1") : (1,522),mac("g2") : (1,522)},
+
+            #
+            mac("g1"): (2,54), mac("g2"): (2,54)
+
+
         },
     }
 
-
-        # TODO: ma h5? sarebbe figo fare una linea a 100mb che passa per 4-5-2 per connettere
-        # g1 e g2 a h5
 
 
 def get_work_forbidden():
