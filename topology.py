@@ -2,6 +2,7 @@ import os
 import shlex
 import time
 
+
 from subprocess import check_output
 
 from comnetsemu.cli import CLI
@@ -156,9 +157,12 @@ try:
 
         info("\n*** Starting network\n")
         print("OK1")
+      
+        
         net.build()
         net.start()
         print("OK")
+        print(check_output(["./queue_create.sh"]))
         
         k=CLI(net)
 

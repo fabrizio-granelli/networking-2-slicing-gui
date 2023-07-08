@@ -289,7 +289,7 @@ class Slicing(app_manager.RyuApp):
                     print("QUEUEUEUEUEEUEUEUE")
 
                     actions = [
-                        datapath.ofproto_parser.OFPActionSetQueue(queue_id=34),
+                        datapath.ofproto_parser.OFPActionSetQueue(queue_id=queue_id),
                         datapath.ofproto_parser.OFPActionOutput(out_port)
                     ]
                     match = datapath.ofproto_parser.OFPMatch(eth_src=src_mac, eth_dst=dst_mac)
