@@ -1,5 +1,7 @@
 from collections import deque
 from os import walk
+
+from ryu.ofproto import ofproto_v1_3
 from ryu.base import app_manager
 from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER, DEAD_DISPATCHER
@@ -58,7 +60,12 @@ class Slicing(app_manager.RyuApp):
         super(Slicing, self).__init__(*args, **kwargs)
         setLogLevel("debug")
 
-        # To print logs even on the connected monitor
+        logging.basicConfig(level=logging.INFO,
+            format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+            datefmt='%m-%d %H:%M')
+        
+
+        # To info logs even on the connected monitor
         # It is thread safe (by default)
         self.log_to_socket = deque()
 
@@ -91,7 +98,7 @@ class Slicing(app_manager.RyuApp):
     def _info(self, msg: str):
 
         self.log_to_socket.appendleft(msg + "\n")
-        info(msg)
+        logging.info(msg)
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -135,27 +142,18 @@ class Slicing(app_manager.RyuApp):
                 debug('unregister datapath: %016x', datapath.id)
                 del self.switch_datapaths_cache[datapath.id]
 
-    def add_flow(self, datapath: app_manager.Datapath, priority, match, actions):
+    def add_flow(self, datapath, priority, match, actions):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
         #Construct flow_mod message and send it.
-        inst = [
-            parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)
-        ]
-
+        inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
         mod = parser.OFPFlowMod(
-            datapath=datapath,
-            priority=priority,
-            match=match,
-            cookie=0,
-            command=ofproto.OFPFC_ADD,
-            idle_timeout=0,
-            hard_timeout=0,
-            instructions=inst,
-            flags=ofproto.OFPFF_SEND_FLOW_REM,
+            datapath=datapath, priority=priority, match=match, instructions=inst
         )
         datapath.send_msg(mod)
+
+        logging.info(" ".join(["quarto", str(datapath.id), str(match)]));
 
     def _send_package(self, msg, datapath: app_manager.Datapath, in_port, actions):
         data = None
@@ -172,23 +170,24 @@ class Slicing(app_manager.RyuApp):
         )
         datapath.send_msg(out)
 
-    def _create_flow_queue(self, ip_src: str, ip_dst: str, queue_n: int, priority: int):
+    def _create_flow_queue(self, dpid: int, ip_src: str, ip_dst: str, queue_n: int, priority: int):
         command = [
             "ovs-ofctl",
             "add-flow",
-            "r1",
+            f"s{dpid}",
             f"ip,priority={priority},nw_src={ip_src},nw_dst={ip_dst},idle_timeout=0,actions=set_queue:{queue_n},normal"
         ]
 
-        print("Running " + " ".join(command))
+        self._info("Running " + " ".join(command))
 
         completed = subprocess.run(command, stdout=PIPE, stderr=STDOUT)
 
         if completed.returncode == 0:
-            print("Comando inviato")
+            self._info("Comando inviato")
+            pass
         else:
-            print("ERROEEEEEEEE")
-            print(completed.stdout)
+            logging.info("ERROEEEEEEEE")
+            info(completed.stdout)
 
 
     def init_flows_slice( self, slice ):
@@ -240,7 +239,7 @@ class Slicing(app_manager.RyuApp):
                 # socket get disconnected
                 conn, addr = sock.accept()
                 with conn:
-                    print(f"Connected by {addr}")
+                    logging.info(f"Connected by {addr}")
                     while True:
                         data = conn.recv(1024)
                         if not data:
@@ -259,7 +258,7 @@ class Slicing(app_manager.RyuApp):
 
                             while sel is not None:
                                 # Taking all the log lines in log_to_socket and sending them
-                                # to the client to print them out
+                                # to the client to info them out
                                 try:
                                     sel = self.log_to_socket.pop()
                                 except IndexError:
@@ -273,7 +272,7 @@ class Slicing(app_manager.RyuApp):
                                     # Fine with ascii text
                                     chunks = [sel[i:i+1024] for i in range(0, len(sel), 1024)]
 
-                                    print(chunks)
+                                    logging.info(chunks)
 
                                     for chunk in chunks:
                                         conn.sendall(chunk.encode("UTF-8"))
@@ -297,7 +296,7 @@ class Slicing(app_manager.RyuApp):
         in_port = msg.match["in_port"]
 
         pkt = packet.Packet(msg.data)
-        # print(pkt)
+        # info(pkt)
         eth: Optional[ethernet.ethernet] = pkt.get_protocol(ethernet.ethernet) # type: ignore -> il metodo letteralmente filtra per tipo
         lv3_pkg: Optional[ipv4.ipv4] = pkt.get_protocol(ipv4.ipv4) # type: ignore
 
@@ -317,42 +316,46 @@ class Slicing(app_manager.RyuApp):
         src_addr = lv3_pkg.src # type: ignore
 
         if self.mac_to_port[self.current_mode] is None or self.forbidden[self.current_mode] is None:
-            self._info("Network not already configured, packet dropped\n")
+            # self._info("Network not already configured, packet dropped\n")
             return
 
         port_mapping: Dict[int, Dict[str, int]] = self.mac_to_port[self.current_mode] #type: ignore
         forbidden: Dict[str, Set[str]] = self.forbidden[self.current_mode] #type: ignore
 
         if src_addr in forbidden and dst_addr in forbidden[src_addr]:
-            self._info("Forbidden ")
-            self._info(f"[s] {src_addr} [d] {dst_addr} [SW] {dpid}\n")
+            # self._info("Forbidden ")
+            # self._info(f"[s] {src_addr} [d] {dst_addr} [SW] {dpid}\n")
             return 
 
         if dpid in port_mapping:
-            # Debug print
+            # Debug info
             if src_addr in all_macs() and dst_addr in all_macs():
-                self._info(f"[s] {src_addr} [d] {dst_addr} [SW] {dpid}\n")
+                self._info(f"\n[s] {src_addr} [d] {dst_addr} [SW] {dpid}")
 
             # Calculate packet destination
 
             if dst_addr in port_mapping[dpid]:
                 # Found a predefined host in a predefined switch 
 
-                out_port = port_mapping[dpid][dst_addr]
+                out_port: Dict | Tuple | int = port_mapping[dpid][dst_addr]
 
                 # Check if the out_port mapping uses input address
                 if isinstance(out_port, Dict):
                     if src_addr in out_port:
                         out_port = out_port[src_addr]
+                    else: 
+                        logging.info("Butto via")
+                        return
 
                 if isinstance(out_port, Tuple):
 
                     out_port, queue_id = out_port
 
-                    print("QUEUEUEUEUEEUEUEUE")
+                    # info("QUEUEUEUEUEEUEUEUE")
 
                     # Setto il nuovo flow
                     self._create_flow_queue(
+                        dpid=dpid,
                         ip_src=src_addr, 
                         ip_dst=dst_addr,
                         queue_n=queue_id,
@@ -360,6 +363,8 @@ class Slicing(app_manager.RyuApp):
                     )
 
                     # Invio il pacchetto attuale
+                    # Questo viene fatto senza queue, di fatto il pacchetto viaggera alla
+                    # massima velocita
                     actions = [
                         # datapath.ofproto_parser.OFPActionSetQueue(queue_id=queue_id),
                         datapath.ofproto_parser.OFPActionOutput(out_port)
@@ -368,12 +373,14 @@ class Slicing(app_manager.RyuApp):
                     self._send_package(msg, datapath, in_port, actions)
 
                 else:
-                    actions = [
-                        datapath.ofproto_parser.OFPActionOutput(out_port),
-                        # datapath.ofproto_parser.OFPActionOutput(datapath.ofproto_parser.OFPP_NORMAL, 0)
-                    ]
-                    match = datapath.ofproto_parser.OFPMatch(ipv4_src=src_addr, ipv4_dst=dst_addr)
-                    self.add_flow(datapath, 1, match, actions)
+                    logging.info(f"Invio alla porta: {out_port}")
+                    logging.info(f"SWITCH: {out_port}")
+
+                    actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
+
+                    match = datapath.ofproto_parser.OFPMatch(eth_type=0x800, ipv4_src=src_addr, ipv4_dst=dst_addr)
+
+                    self.add_flow(datapath, 2, match, actions)
                     self._send_package(msg, datapath, in_port, actions)
 
         elif dpid not in self.end_swtiches:

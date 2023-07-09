@@ -7,10 +7,21 @@ def get_work_mac_mapping():
             mac("h1"): 3, mac("h2"): 4, mac("g1"): 5,
 
             # Slow connection
-            mac("gs"): 2, mac("g2"): 2,
+            mac("gs"): 2, 
+
+            mac("g2"): {
+                mac("g1"): 2
+            },
 
             # Fast connection
-            mac("h3"): 1, mac("h4"): 1, mac("h5"): 1,
+            mac("h3"): 1, mac("h4"): 1, 
+
+            mac("h5"): {
+                mac("h1"): 1, 
+                mac("h2"): 1,
+
+                mac("g1"): 2
+            },
 
             mac("ps"): 1,
         },
@@ -35,10 +46,22 @@ def get_work_mac_mapping():
             mac("h3"): 3, mac("h4"): 4, mac("g2"): 5,
 
             # Slow connection
-            mac("gs"): 2, mac("g1"): 2,
+            mac("gs"): 2, 
+
+            mac("g1"): {
+                mac("g2"): 2
+
+            },
 
             # Fast connection
-            mac("h1"): 1, mac("h2"): 1, mac("h5"): 1,
+            mac("h1"): 1, mac("h2"): 1, 
+
+            mac("h5"): {
+                mac("h3"): 1, 
+                mac("h4"): 1,
+
+                mac("g2"): 2
+            },
 
             mac("ps"): 1,
         },
@@ -52,7 +75,6 @@ def get_work_mac_mapping():
             mac("g2"): 3,
 
             # No other connections in work mode
-            # TODO: maybe h5?
             mac("h5"): (2,45),
         },
 
@@ -61,7 +83,15 @@ def get_work_mac_mapping():
             mac("ps"): 3,
 
             # fast connection  dst, {src : (output port, output queue)}
-            mac("h1"): {mac("ps") : (1,521)}, mac("h2"): {mac("ps"):(1,521)}, mac("h3"): {mac("ps"):(1,521)}, mac("h4"): {mac("ps"):(1,521)}, mac("h5"): {mac("ps"):(1,521), mac("g1") : (1,522),mac("g2") : (1,522)},
+            mac("h1"): {mac("ps") : (1,521)}, 
+            mac("h2"): {mac("ps"):(1,521)}, 
+            mac("h3"): {mac("ps"):(1,521)}, 
+            mac("h4"): {mac("ps"):(1,521)}, 
+            mac("h5"): {
+                mac("ps"):(1,521), 
+                mac("g1") : (1,522),
+                mac("g2") : (1,522)
+            },
 
             #
             mac("g1"): (2,54), mac("g2"): (2,54)
@@ -88,7 +118,7 @@ def get_work_forbidden():
         mac("h2"): work_host_forbidden,
         mac("h3"): work_host_forbidden,
         mac("h4"): work_host_forbidden,
-        # TODO: h5
+        mac("h5"): set([ mac("gs") ]),
 
         mac("ps"): work_host_forbidden,
         mac("gs"): gaming_host_forbidden,
