@@ -13,16 +13,6 @@ def get_work_emergency_mac_mapping():
             # TODO: Anche questa sarebbe corretta mac("ps"): 2, 
         },
 
-        2: {
-            # Direct connections
-            mac("h5"): 4,
-
-            # Fast connection
-            mac("h1"): 1, mac("h2"): 1, mac("h3"): 3, mac("h4"): 3,
-
-            # Fast connection for production server
-            mac("ps"): 2,
-        },
 
         3: {
             # Direct connections
