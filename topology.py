@@ -21,8 +21,8 @@ class NetworkTopology(Topo):
 
         Topo.__init__(self)
 
-        gig_net = { "bw": 1000 }
-        megabit_net = { "bw": 100 }
+        gig_net = {}
+        megabit_net = {}
         host_link_config = dict()
         
         

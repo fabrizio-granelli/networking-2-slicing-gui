@@ -10,47 +10,20 @@ from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet, ipv4
 from ryu.lib.packet import ether_types
-from ryu.lib.packet import udp
-from ryu.lib.packet import tcp
-from ryu.lib.packet import icmp
 from ryu.lib import hub
 from mininet.log import info,debug, setLogLevel
 import socket
-import time
 import subprocess
 from subprocess import PIPE, STDOUT, check_output
-import shlex
-import argparse
 import logging
-
-from textwrap import wrap
 
 from typing import List, Optional, Dict, Set, Tuple
 from slicing.work_emergency import get_work_emergency_forbidden, get_work_emergency_mac_mapping
 
 from slicing.gaming_slice import get_gaming_forbidden, get_gaming_mac_mapping
 
-from slicing.net_structure import Mode, all_macs
+from slicing.net_structure import Mode, all_macs, all_switches
 from slicing.work_slice import get_work_mac_mapping, get_work_forbidden
-
-from ryu.cfg import CONF
-from ryu.lib.ovs.bridge import OVSBridge
-
-OVSDB_ADDR = 'unix:/var/run/openvswitch/db.sock'
-
-queues = {
-    5: {
-        1: [ 900, 100 ],
-        2: [ 900, 100 ],
-    },
-    2: {
-        2: [ 900, 100 ],
-    },
-    4: {
-        2: [ 900, 100 ],
-    },
-}
-
 
 class Slicing(app_manager.RyuApp):
     # Tested OFP version
@@ -103,15 +76,8 @@ class Slicing(app_manager.RyuApp):
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
         datapath = ev.msg.datapath
-        dpid = datapath.id
 
         self._flow_entry_empty(datapath)
-
-        # if dpid in queues:
-        #     for port_id in queues[dpid]:
-        #         for speed in queues[dpid][port_id]:
-        #
-        #             self._configure_queue(dpid, port_id, speed)
 
     def _flow_entry_empty(self, datapath):
         # Install the table-miss flow entry.
@@ -124,12 +90,6 @@ class Slicing(app_manager.RyuApp):
         ]
         self.add_flow(datapath, 0, match, actions)
 
-    # def _configure_queue(self, dpid:int, portid: int, max_rate: int):
-    #
-    #     info(f"Requested configuration of dpid: {dpid}, portid: {portid}, max_rate: {max_rate}")
-    #     ovs_bridge = OVSBridge(CONF, datapath_id=dpid, ovsdb_addr=OVSDB_ADDR)
-    #     info(ovs_bridge.set_qos(f"s{dpid}-eth{portid}",type='linux-htb',max_rate=str(max_rate)))
-
     @set_ev_cls(ofp_event.EventOFPStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
     def _state_change_handler(self, ev):
         datapath = ev.datapath
@@ -137,6 +97,25 @@ class Slicing(app_manager.RyuApp):
             if datapath.id not in self.switch_datapaths_cache:
                 debug('register datapath: %016x', datapath.id)
                 self.switch_datapaths_cache[datapath.id] = datapath
+
+                if len(self.switch_datapaths_cache) == len(all_switches()):
+
+                    command = [
+                        "./queue_create.sh",
+                    ]
+
+                    self._info("Running " + " ".join(command))
+
+                    completed = subprocess.run(command, stdout=PIPE, stderr=STDOUT)
+
+                    if completed.returncode == 0:
+                        self._info("Comando inviato")
+                        pass
+                    else:
+                        logging.info("Errore invio comando " + " ".join(command))
+                        info(completed.stdout)
+
+
         elif ev.state == DEAD_DISPATCHER:
             if datapath.id in self.switch_datapaths_cache:
                 debug('unregister datapath: %016x', datapath.id)
