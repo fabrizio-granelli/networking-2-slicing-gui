@@ -20,8 +20,8 @@ class ComplexNetworkTopo(Topo):
         # Create template host, switch, and link
         host_config = { "inNamespace":True }
         server_config = { "inNamespace":True }
-        gig_net = { "bw": 1000 }
-        megabit_net = { "bw": 100 }
+        gig_net = {  }
+        megabit_net = {  }
         host_link_config = {}
 
         # Create switches
@@ -98,7 +98,7 @@ if __name__ == "__main__":
         topo=topo,
         switch=OVSKernelSwitch,
         build=False,
-        # autoSetMacs=True,
+        autoSetMacs=True,
         autoStaticArp=True,
         link=TCLink,
     )

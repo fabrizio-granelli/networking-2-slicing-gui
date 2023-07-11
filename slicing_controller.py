@@ -170,12 +170,13 @@ class Slicing(app_manager.RyuApp):
         )
         datapath.send_msg(out)
 
-    def _create_flow_queue(self, dpid: int, ip_src: str, ip_dst: str, queue_n: int, priority: int):
+    def _create_flow_queue(self, dpid: int, ip_src: str, ip_dst: str, queue_n: int, priority: int, port: int):
+
         command = [
             "ovs-ofctl",
             "add-flow",
             f"s{dpid}",
-            f"ip,priority={priority},nw_src={ip_src},nw_dst={ip_dst},idle_timeout=0,actions=set_queue:{queue_n},normal"
+            f"ip,priority={priority},nw_src={ip_src},nw_dst={ip_dst},idle_timeout=0,actions=set_queue:{queue_n},output={port},pop_queue"
         ]
 
         self._info("Running " + " ".join(command))
@@ -359,7 +360,8 @@ class Slicing(app_manager.RyuApp):
                         ip_src=src_addr, 
                         ip_dst=dst_addr,
                         queue_n=queue_id,
-                        priority=2
+                        priority=2,
+                        port=out_port #type: ignore
                     )
 
                     # Invio il pacchetto attuale
