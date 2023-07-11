@@ -73,7 +73,7 @@ class Slicing(app_manager.RyuApp):
         self.log_to_socket.appendleft(msg + "\n")
         logging.info(msg)
 
-    @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
+    @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER) # type: ignore
     def switch_features_handler(self, ev):
         datapath = ev.msg.datapath
 
@@ -122,6 +122,10 @@ class Slicing(app_manager.RyuApp):
                 del self.switch_datapaths_cache[datapath.id]
 
     def add_flow(self, datapath, priority, match, actions):
+        '''
+            Add flow to the flow table of the selected switch ( by its
+            datapath )
+        '''
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
@@ -132,9 +136,11 @@ class Slicing(app_manager.RyuApp):
         )
         datapath.send_msg(mod)
 
-        logging.info(" ".join(["quarto", str(datapath.id), str(match)]));
-
     def _send_package(self, msg, datapath: app_manager.Datapath, in_port, actions):
+        '''
+            Sends a package directly using the controller, before the actual flow 
+            table entry is used, so that the first ping 
+        '''
         data = None
         ofproto = datapath.ofproto
         if msg.buffer_id == ofproto.OFP_NO_BUFFER:
@@ -150,7 +156,10 @@ class Slicing(app_manager.RyuApp):
         datapath.send_msg(out)
 
     def _create_flow_queue(self, dpid: int, ip_src: str, ip_dst: str, queue_n: int, priority: int, port: int):
-
+        '''
+            To create flow table entry wrapping ovs-ofctl. Workaround to the
+            ryu not fully-working queue implementation
+        '''
         command = [
             "ovs-ofctl",
             "add-flow",
@@ -171,6 +180,10 @@ class Slicing(app_manager.RyuApp):
 
 
     def init_flows_slice( self, slice ):
+        '''
+            Method to re-initialize the switches to apply the slicing mode.
+            Flow tables are cleared and the default route is configured
+        '''
 
         assert slice == Mode.WORK_MODE or slice == Mode.GAMING_MODE or slice == Mode.WORK_EMERGENCY_MODE 
 
@@ -208,6 +221,9 @@ class Slicing(app_manager.RyuApp):
     
 
     def _monitor(self):
+        '''
+            Secondary thread that manages TCP connections from the GUI
+        '''
 
         debug("Thread started")
 
@@ -264,20 +280,20 @@ class Slicing(app_manager.RyuApp):
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
-        # info(f"Ricevuto PACCHETTO")
-        #Get packet info
+        '''
+            Main packet handling function. It works by using the predefined
+            topology, based on the actual slice. 
+        '''
         msg = ev.msg
 
         datapath: app_manager.Datapath = msg.datapath
         dpid = datapath.id
-        # info(f"Ricevuto da {dpid}")
 
         ofproto = datapath.ofproto
         in_port = msg.match["in_port"]
 
         pkt = packet.Packet(msg.data)
-        # info(pkt)
-        eth: Optional[ethernet.ethernet] = pkt.get_protocol(ethernet.ethernet) # type: ignore -> il metodo letteralmente filtra per tipo
+        eth: Optional[ethernet.ethernet] = pkt.get_protocol(ethernet.ethernet) # type: ignore -> It literally filters by type
         lv3_pkg: Optional[ipv4.ipv4] = pkt.get_protocol(ipv4.ipv4) # type: ignore
 
         if (
@@ -289,30 +305,27 @@ class Slicing(app_manager.RyuApp):
             # ignore lldp packet
             return
 
-        # dst_addr = eth.dst
-        # src_addr = eth.src
-
         dst_addr = lv3_pkg.dst # type: ignore
         src_addr = lv3_pkg.src # type: ignore
 
         if self.mac_to_port[self.current_mode] is None or self.forbidden[self.current_mode] is None:
-            # self._info("Network not already configured, packet dropped\n")
+            self._info("Network not already configured, packet dropped\n")
             return
 
         port_mapping: Dict[int, Dict[str, int]] = self.mac_to_port[self.current_mode] #type: ignore
         forbidden: Dict[str, Set[str]] = self.forbidden[self.current_mode] #type: ignore
 
         if src_addr in forbidden and dst_addr in forbidden[src_addr]:
-            # self._info("Forbidden ")
-            # self._info(f"[s] {src_addr} [d] {dst_addr} [SW] {dpid}\n")
+            self._info("Forbidden packet")
+            self._info(f"[s] {src_addr} [d] {dst_addr} [SW] {dpid}")
             return 
 
         if dpid in port_mapping:
-            # Debug info
-            if src_addr in all_macs() and dst_addr in all_macs():
-                self._info(f"\n[s] {src_addr} [d] {dst_addr} [SW] {dpid}")
-
             # Calculate packet destination
+
+            # Prints packet useful informations
+            if src_addr in all_macs() and dst_addr in all_macs():
+                self._info(f"[s] {src_addr} [d] {dst_addr} [SW] {dpid}")
 
             if dst_addr in port_mapping[dpid]:
                 # Found a predefined host in a predefined switch 
@@ -324,16 +337,12 @@ class Slicing(app_manager.RyuApp):
                     if src_addr in out_port:
                         out_port = out_port[src_addr]
                     else: 
-                        logging.info("Butto via")
+                        logging.info("Undefined route")
                         return
 
                 if isinstance(out_port, Tuple):
-
                     out_port, queue_id = out_port
 
-                    # info("QUEUEUEUEUEEUEUEUE")
-
-                    # Setto il nuovo flow
                     self._create_flow_queue(
                         dpid=dpid,
                         ip_src=src_addr, 
@@ -344,18 +353,13 @@ class Slicing(app_manager.RyuApp):
                     )
 
                     # Invio il pacchetto attuale
-                    # Questo viene fatto senza queue, di fatto il pacchetto viaggera alla
-                    # massima velocita
-                    actions = [
-                        # datapath.ofproto_parser.OFPActionSetQueue(queue_id=queue_id),
-                        datapath.ofproto_parser.OFPActionOutput(out_port)
-                        # datapath.ofproto_parser.OFPActionOutput(datapath.ofproto_parser.OFPP_NORMAL, 0)
-                    ]
+                    # The packet is sent through the switch without applying any
+                    # QoS rule. This in fact DOES NOT limit the first packet sent
+                    actions = [ datapath.ofproto_parser.OFPActionOutput(out_port) ]
                     self._send_package(msg, datapath, in_port, actions)
 
                 else:
-                    logging.info(f"Invio alla porta: {out_port}")
-                    logging.info(f"SWITCH: {out_port}")
+                    self._info(f"Output Port: {out_port}")
 
                     actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
 
@@ -364,13 +368,9 @@ class Slicing(app_manager.RyuApp):
                     self.add_flow(datapath, 2, match, actions)
                     self._send_package(msg, datapath, in_port, actions)
 
-        elif dpid not in self.end_swtiches:
-            # Found unknown switch, return
-            out_port = ofproto.OFPP_FLOOD
-            actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
-            match = datapath.ofproto_parser.OFPMatch(in_port=in_port)
-            self.add_flow(datapath, 1, match, actions)
-            self._send_package(msg, datapath, in_port, actions)
+        else:
+            # Found unknown switch, no packet output
+            self._info("Error! Found unknown switch")
 
 
 
