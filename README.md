@@ -20,13 +20,13 @@ While in ```work mode``` every connection between Gaming and Work is severed, wi
 - h5 will be connected with g1 and g2 at 2Mbit/sec
 - h1-g5 will be connected with ps at 8Mbit/sec
 
-![image](images/Work.png.png)
+![image](images/Work.png)
 
 #### Test
 
 ![image](images/pingall_work.png)
 
-![image](images/iper_g1_h5.png.png)
+![image](images/iper_g1_h5.png)
 
 ![image](images/iperf%20_h1_p_serv.png)
 
@@ -35,7 +35,7 @@ While in ```work mode``` every connection between Gaming and Work is severed, wi
 ### Gaming mode
 While in ```gaming mode``` only ps is disconnected from the network
 
-![image](images/Gaming.png.png)
+![image](images/Gaming.png)
 
 #### Test
 
