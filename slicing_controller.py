@@ -263,7 +263,6 @@ class Slicing(app_manager.RyuApp):
                                 if sel:
                                     # Splitting the text in finite-size chunks when sending
                                     # them to the client
-                                    # TODO: padding?
 
                                     # Fine with ascii text
                                     chunks = [sel[i:i+1024] for i in range(0, len(sel), 1024)]
