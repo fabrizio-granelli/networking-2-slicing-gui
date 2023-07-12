@@ -15,26 +15,31 @@ Depending on the mode selected the bandwidth is divided between the slice
 
 ### Work mode
 While in ```work mode``` every connection between Gaming and Work is severed, with the exception of h5 which should connect with all the hosts excluding gs, meaning that 
-- h1-h5 will be connected each other at 100Mbit/sec
-- g1, g2, gs will be connected each other at 30Mbit/sec
-- h5 will be connected with g1 and g2 at 20Mbit/sec
-- h1-g5 will be connected with ps at 80Mbit/sec
+- h1-h5 will be connected each other at 10Mbit/sec
+- g1, g2, gs will be connected each other at 3Mbit/sec
+- h5 will be connected with g1 and g2 at 2Mbit/sec
+- h1-g5 will be connected with ps at 8Mbit/sec
 
-![image](images/Work.png)
+![image](images/Work.png.png)
 
 #### Test
 
-Inserire test in work mode (CLI e GUI)
 ![image](images/pingall_work.png)
+
+![image](images/iper_g1_h5.png.png)
+
+![image](images/iperf%20_h1_p_serv.png)
+
+
 
 ### Gaming mode
 While in ```gaming mode``` only ps is disconnected from the network
 
-![image](images/Gaming.png)
+![image](images/Gaming.png.png)
 
 #### Test
 
-Inserire test in gaming mode (CLI e GUI)
+![image](images/pingall_gaming.png)
 
 
 ### Emergency mode
@@ -44,13 +49,18 @@ While in ```emergency mode``` only h1-h5 and ps are connected
 
 #### Test
 
-Inserire test in emergency mode (CLI e GUI)
+![image](images/pingall_emergency.png)
+
+## GUI
+To switch between modes GUI is required
+
+![image](images/GUI.png)
 
 ## How to run
 1. Connect with a comnetsemu portale or install all the functionalities in your system
 2. Launch the controller  
 ```$ sudo ryu-manager controller.py```
-3. To run the program with the GUI launch
+3. Launch the GUI
 ```$ python3 gui.py```
 4. Emulate the topology with mininet
 ```$ sudo python3 topology.py```
@@ -77,7 +87,7 @@ $ sudo mn -c
 
 
 ## Presentation
-[Project presentations]()
+[Project presentations](https://www.canva.com/design/DAFoYFIvK24/ZPs5t2_PmwqwCJam0pWI1Q/edit?utm_content=DAFoYFIvK24&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)
 
 ## Acknowledgment
 Students: [Marco Zanon](https://github.com/marco-zan) - [Giuseppe Ostacchini](https://github.com/beppeosta) - [Luca Checchin](https://github.com/Kayser9)
