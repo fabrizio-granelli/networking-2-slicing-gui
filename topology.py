@@ -1,9 +1,3 @@
-import os
-import shlex
-import time
-
-
-from subprocess import check_output
 
 from comnetsemu.cli import CLI
 from comnetsemu.net import Containernet, VNFManager
@@ -83,21 +77,21 @@ class NetworkTopology(Topo):
             mac="00:00:00:00:00:07",
             docker_args={"hostname": "g2"}
         )
-        g_serv = self.addHost(
-            "g_serv",
+        gs = self.addHost(
+            "gs",
             cls=DockerHost,
             dimage="dev_test",
             ip="10.0.0.8/24",
             mac="00:00:00:00:01:01",
-            docker_args={"hostname": "g_serv"}
+            docker_args={"hostname": "gs"}
         )
-        p_serv = self.addHost(
-            "p_serv",
+        ps = self.addHost(
+            "ps",
             cls=DockerHost,
             dimage="dev_test",
             ip="10.0.0.9/24",
             mac="00:00:00:00:01:02",
-            docker_args={"hostname": "p_serv"}
+            docker_args={"hostname": "ps"}
         )
         
         for i in range(5):
@@ -121,15 +115,8 @@ class NetworkTopology(Topo):
         self.addLink("h4", "s3", 1, 4, **host_link_config)
         self.addLink("g2", "s3", 1, 5, **host_link_config)
 
-        self.addLink("g_serv", "s4", 1, 4, **host_link_config)
-        self.addLink("p_serv", "s5", 1, 3, **host_link_config)
-
-
-
-
-#topos = {"networkslicingtopo": (lambda: NetworkTopology())}
-
-
+        self.addLink("gs", "s4", 1, 4, **host_link_config)
+        self.addLink("ps", "s5", 1, 3, **host_link_config)
 
 try:
     if __name__ == "__main__":
@@ -148,26 +135,17 @@ try:
 
         mgr = VNFManager(net)
 
-
-
         info("*** Connecting to the controller\n")
         controller = RemoteController("c1", ip="127.0.0.1", port=6633)
         net.addController(controller)
-        #net.addController("c0")
 
         info("\n*** Starting network\n")
-        print("OK1")
-      
         
         net.build()
         net.start()
-        print("OK")
-        #print(check_output(["./mapping_test.sh"]))
-        #print(check_output(["./queue_create.sh"]))
         
         k=CLI(net)
 
         net.stop()
 except Exception as e: 
     print(e)
-    # net.stop()
